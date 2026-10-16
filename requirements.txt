@@ -1,0 +1,16 @@
+# Core deps for the bi-encoder retrieval pipeline.
+# Pin versions once you know what works on your machine (esp. torch/faiss + CUDA vs CPU).
+
+torch
+transformers
+faiss-cpu          # swap for faiss-gpu if you have CUDA and want fast large-scale indexing
+numpy
+pandas
+scikit-learn        # handy for train/val/test splitting, misc metrics
+tqdm
+pyyaml              # for config.yaml loading
+pytest              # for tests/
+requests            # for scripts/fetch_clinical_trials.py's API calls
+openai              # for scripts/generate_queries.py's LLM calls
+python-dotenv       # loads OPENAI_API_KEY from a .env file at the repo root
+datasets            # for loading and processing the dataset

@@ -1,0 +1,66 @@
+# Central config for the whole pipeline. Load this in scripts/ with `yaml.safe_load`.
+# Fill in real values as you build each stage; keep this as the single source of truth
+# instead of hardcoding paths/hyperparameters inside modules.
+
+api:
+  base_url: "https://clinicaltrials.gov/api/v2/studies?filter.overallStatus=COMPLETED"
+  output_path: data/raw/studies.jsonl         # raw fetched studies, one JSON object per line
+  state_path: data/raw/fetch_state.json       # pagination resume state (next_page_token, num_fetched)
+  max_studies: 10000                           # target corpus size for this project
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  train_pairs_file: null      # e.g. data/raw/train_qp_pairs.jsonl -> list of {query, passage}
+  studies_file: data/raw/studies.jsonl  # output of scripts/fetch_clinical_trials.py; full corpus for FAISS
+  queries_file: data/raw/queries.jsonl
+  eval_labels_file: null      # e.g. data/raw/eval_labels.jsonl -> query -> relevant passage ids
+
+queries:
+  model: "gpt-6-luna"                # cheap + good enough for short query generation; swap freely
+  temperature: 0.7
+  max_input_chars: 1600               # truncate study text before sending, to control cost
+  output_path: data/raw/queries.jsonl
+  max_studies: null                   # null = process every study in corpus_file
+  log_every: 50
+  request_timeout: 30                 # seconds per API call
+  max_retries: 5                      # retries w/ backoff on rate limits / transient errors
+  max_workers: 8                      # concurrent in-flight API calls; raise/lower based on rate limits
+
+model:
+  base_model_name: "bert-base-uncased"  # or a biomedical BERT variant (e.g. PubMedBERT)
+  use_custom_encoder: true             # true -> use src/models/custom_encoder.py instead
+  d_model: 128                    # projected embedding size if you add a projection head
+  num_layers: 3                         # only relevant if use_custom_encoder: true
+  num_heads: 4                # only relevant if use_custom_encoder: true
+  pooling: "mean"                       # "mean" | "cls"
+  max_seq_length: 256
+  d_ff: 512
+  dict_size: 100000
+
+training:
+  batch_size: 32
+  learning_rate: 2e-5
+  num_epochs: 3
+  temperature: 0.05      # softmax temperature for contrastive/InfoNCE loss
+  optimizer: "adamw"
+  warmup_steps: 0
+  checkpoint_dir: checkpoints/
+
+faiss:
+  index_type: "flat"     # "flat" (exact) | "ivf" | "hnsw" for larger corpora
+  index_path: artifacts/passage_index.faiss
+  embeddings_path: artifacts/passage_embeddings.npy
+  id_map_path: artifacts/passage_id_map.json
+  top_k: 10
+
+evaluation:
+  k_values: [5, 10, 20]
+
+mining:
+  cross_encoder_model_name: "cross-encoder/ms-marco-MiniLM-L-6-v2"  # or fine-tune your own
+  top_k_candidates: 100
+  positive_score_threshold: 0.8   # above this -> true positive
+  negative_score_threshold: 0.3   # below this -> hard negative; between = danger zone, excluded
+
+seed: 42
